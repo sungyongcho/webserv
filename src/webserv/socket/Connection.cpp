@@ -32,7 +32,7 @@ Connection *Connection::eventAccept(SocketManager *sm) {
 
   if (s == -1) {
     Logger::logError(LOG_ALERT, "accept() failed");
-    throw AcceptExcception();
+    throw AcceptException();
   }
 
   Connection *c = sm->getConnection(s);

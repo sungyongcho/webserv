@@ -1,0 +1,6 @@
+*.o
+*.d
+webserv
+.DS_Store
+error.log
+webserv.dSYM/

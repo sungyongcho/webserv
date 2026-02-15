@@ -46,7 +46,7 @@ class NonblockingException : public std::exception {
   }
 };
 
-class AcceptExcception : public std::exception {
+class AcceptException : public std::exception {
   virtual const char *what() const throw() {
     return ("accept() error.");
   }
