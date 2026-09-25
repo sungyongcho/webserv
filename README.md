@@ -1,34 +1,33 @@
 # webserv
 
-> HTTP/1.1 server written in C++98 with multiplexing, CGI support, and Nginx-like configuration.
+> HTTP/1.1 server written in C++98 with a kqueue event loop, CGI support, and Nginx-like configuration.
 
 ## Overview
 
-A fully functional HTTP/1.1 web server built from scratch in C++98. The server handles concurrent connections using non-blocking I/O with poll/kqueue multiplexing, parses an Nginx-inspired configuration file, supports GET/POST/PUT/DELETE methods, and executes CGI scripts (PHP, Python). Designed to serve static websites, handle file uploads, and proxy requests — all while never blocking or crashing.
+An HTTP/1.1 web server in C++98 with no external dependencies. It handles concurrent connections with non-blocking sockets on a single kqueue event loop, parses an Nginx-inspired configuration file, serves GET, HEAD, POST, PUT and DELETE requests, and runs CGI scripts (for example PHP) through fork/execve. It serves static sites and handles file uploads.
 
-This project was developed by a 2-member team at 42 School and received a score of 100/100. I led the core server architecture and implementation.
+A 42 Seoul team project (Jul - Aug 2021). My parts: the kqueue event loop, the non-blocking listening and connection socket layer, the configuration-file tokenizer, and CGI execution through fork/execve with CGI environment variables (tested with 42's cgi_tester). Teammates wrote most of the configuration directive parsing, the chunked request decoding and the rest of the request and response handling.
 
 ## Tech Stack
 
 | Layer | Technologies |
 |-------|-------------|
 | Language | C++98 |
-| I/O | poll / kqueue (non-blocking, single-thread multiplexing) |
-| Protocol | HTTP/1.1 (RFC 7230-7235 compliant) |
+| I/O | kqueue (non-blocking, single-threaded event loop; macOS/BSD) |
+| Protocol | HTTP/1.1 (the subset the 42 subject requires) |
 | Build | Makefile |
 
 ## Key Features
 
-- Non-blocking I/O multiplexing with poll/kqueue — single event loop handles all connections
+- Non-blocking sockets on a single kqueue event loop that handles all connections
 - Nginx-like configuration file format with server blocks, location directives, and route rules
 - GET, POST, PUT, DELETE, and HEAD method support
-- CGI execution for dynamic content (PHP, Python) with environment setup and process management
+- CGI execution through fork/execve with CGI environment variables
 - Directory listing (autoindex), default index files, and custom error pages
 - HTTP redirections (301, 302) and return directives
 - Client body size limits and chunked transfer encoding
 - File upload handling with configurable upload directories
 - Multiple virtual servers on different ports with server_name matching
-- Stress-test resilient — the server must never die
 
 ## Architecture
 
@@ -36,19 +35,24 @@ This project was developed by a 2-member team at 42 School and received a score 
 webserv/
 ├── src/webserv/
 │   ├── config/
-│   │   ├── HttpConfig.hpp/cpp       # Config file parsing and tokenization
-│   │   ├── ServerConfig.hpp/cpp     # Server block configuration
-│   │   └── LocationConfig.hpp/cpp   # Location directive configuration
+│   │   ├── Tokenizer.hpp/cpp        # Config file tokenizer
+│   │   ├── HttpConfig.hpp/cpp       # http block parsing
+│   │   ├── ServerConfig.hpp/cpp     # server block configuration
+│   │   └── LocationConfig.hpp/cpp   # location directive configuration
 │   ├── socket/
-│   │   └── Connection.hpp/cpp       # Socket management and connection state
+│   │   ├── Kqueue.hpp/cpp           # kqueue event registration and polling
+│   │   ├── Cycle.hpp/cpp            # Event loop
+│   │   ├── Listening.hpp/cpp        # Listening sockets
+│   │   ├── Connection.hpp/cpp       # Connection state
+│   │   └── SocketManager.hpp/cpp    # Socket lifecycle
 │   ├── message/
 │   │   ├── Request.hpp/cpp          # HTTP request parsing (method, URI, headers)
 │   │   ├── Response.hpp/cpp         # HTTP response construction
 │   │   └── handler/
 │   │       ├── RequestHandler.hpp/cpp   # Request validation and routing
-│   │       └── ResponseHandler.hpp/cpp  # Response generation (methods, autoindex)
-│   ├── cgi/
-│   │   └── CgiHandler.hpp/cpp       # CGI process execution and I/O
+│   │       ├── ResponseHandler.hpp/cpp  # Response generation (methods, autoindex)
+│   │       └── CgiHandler.hpp/cpp       # CGI process execution
+│   ├── logger/                      # Logging helpers
 │   └── Exceptions.hpp               # Custom exception hierarchy
 ├── config/
 │   └── sample.conf                  # Example Nginx-style configuration
@@ -61,8 +65,8 @@ webserv/
 ### Prerequisites
 
 ```bash
-# C++98 compatible compiler (g++, clang++)
-# macOS or Linux
+# C++98 compatible compiler (clang++)
+# macOS (kqueue); it does not build on Linux
 ```
 
 ### Installation
@@ -97,21 +101,15 @@ The `tester/` directory includes official 42 tester binaries for quick validatio
 ./webserv config/sample.conf
 
 # Terminal B: run testers
-# macOS
 ./tester/tester
 ./tester/cgi_tester
-
-# Linux (make binaries executable once)
-chmod +x ./tester/ubuntu_tester ./tester/ubuntu_cgi_tester
-./tester/ubuntu_tester
-./tester/ubuntu_cgi_tester
 ```
 
 ## What This Demonstrates
 
-- **Systems Programming**: Built a production-style HTTP server from scratch in C++98 with non-blocking I/O, event-driven architecture, and zero external dependencies.
-- **Protocol Implementation**: Parsed and generated HTTP/1.1 messages compliant with RFC 7230-7235, handling edge cases like chunked encoding, multipart uploads, and CGI process management.
-- **Concurrent I/O**: Implemented single-threaded multiplexing with poll/kqueue where a single event loop handles all socket reads, writes, and CGI pipe communication without blocking.
+- **Systems Programming**: An HTTP/1.1 server in C++98 with non-blocking I/O, an event-driven architecture and no external dependencies.
+- **Protocol Implementation**: HTTP/1.1 request parsing and response generation, including chunked request bodies and CGI.
+- **Concurrent I/O**: One kqueue event loop handles all socket reads and writes on a single thread.
 
 ## License
 
